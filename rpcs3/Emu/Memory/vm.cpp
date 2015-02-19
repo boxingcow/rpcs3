@@ -242,6 +242,11 @@ namespace vm
 		return broken;
 	}
 
+	bool reservation_acquire_no_cb(void* data, u32 addr, u32 size)
+	{
+		return reservation_acquire(data, addr, size);
+	}
+
 	bool reservation_update(u32 addr, const void* data, u32 size)
 	{
 		assert(size == 1 || size == 2 || size == 4 || size == 8 || size == 128);
@@ -271,7 +276,7 @@ namespace vm
 		return true;
 	}
 
-	bool reservation_query(u32 addr, bool is_writing)
+	bool reservation_query(u32 addr, u32 size, bool is_writing, std::function<bool()> callback)
 	{
 		std::lock_guard<reservation_mutex_t> lock(g_reservation_mutex);
 
@@ -280,10 +285,18 @@ namespace vm
 			return false;
 		}
 
-		if (is_writing)
+		// check if current reservation and address may overlap
+		if (g_reservation_addr >> 12 == addr >> 12 && is_writing)
 		{
-			// break the reservation
-			_reservation_break(addr);
+			if (size && addr + size - 1 >= g_reservation_addr && g_reservation_addr + g_reservation_size - 1 >= addr)
+			{
+				// break the reservation if overlap
+				_reservation_break(addr);
+			}
+			else
+			{
+				return callback(); //? true : _reservation_break(addr), true;
+			}
 		}
 		
 		return true;
