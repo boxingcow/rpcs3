@@ -42,17 +42,16 @@ namespace detail
 	}
 }
 
-void default_syscall(PPUThread& CPU);
-static func_caller *null_func = bind_func(default_syscall);
+void null_func(PPUThread& CPU);
 
-static const int kSyscallTableLength = 1024;
+const int kSyscallTableLength = 1024;
 
 // UNS = Unused
 // ROOT = Root
 // DBG = Debug
 // PM = Product Mode
 // AuthID = Authentication ID
-static func_caller* sc_table[kSyscallTableLength] =
+const ppu_func_caller sc_table[1024] =
 {
 	null_func,
 	bind_func(sys_process_getpid),                          //1   (0x001)
@@ -897,25 +896,7 @@ static func_caller* sc_table[kSyscallTableLength] =
 	null_func, null_func, null_func, bind_func(cellGcmCallback), //1023  UNS
 };
 
-/** HACK: Used to delete func_caller objects that get allocated and stored in sc_table (above).
-* The destructor of this static object gets called when the program shuts down.
-*/
-struct SyscallTableCleaner_t
-{
-	SyscallTableCleaner_t() {}
-	~SyscallTableCleaner_t()
-	{
-		for (int i = 0; i < kSyscallTableLength; ++i)
-		{
-			if (sc_table[i] != null_func)
-				delete sc_table[i];
-		}
-
-		delete null_func;
-	}
-} SyscallTableCleaner_t;
-
-void default_syscall(PPUThread& CPU)
+void null_func(PPUThread& CPU)
 {
 	u32 code = (u32)CPU.GPR[11];
 	//TODO: remove this
@@ -940,23 +921,37 @@ void default_syscall(PPUThread& CPU)
 		return;
 	}
 
-	LOG_ERROR(HLE, "Unknown syscall: %d - %08x", code, code);
+	LOG_ERROR(HLE, "Unknown syscall: %d - %08x -> CELL_OK", code, code);
 	CPU.GPR[3] = 0;
 	return;
 }
 
-void SysCalls::DoSyscall(PPUThread& CPU, u32 code)
+void SysCalls::DoSyscall(PPUThread& CPU, u64 code)
 {
+	auto old_last_syscall = CPU.m_last_syscall;
+	CPU.m_last_syscall = code;
+
+	if (code >= 1024)
+	{
+		throw "Invalid syscall number";
+	}
+
 	//Auto Pause using simple singleton.
 	Debug::AutoPause::getInstance().TryPause(code);
 
-	if(code < 1024)
+	if (Ini.HLELogging.GetValue())
 	{
-		(*sc_table[code])(CPU);
-		return;
+		LOG_NOTICE(PPU, "SysCall called: %s [0x%llx]", "unknown", code);
 	}
 
-	throw "Invalid syscall number";
+	sc_table[code](CPU);
+
+	if (Ini.HLELogging.GetValue())
+	{
+		LOG_NOTICE(PPU, "SysCall finished: %s [0x%llx] -> 0x%llx", "unknown", code, CPU.GPR[3]);
+	}
+
+	CPU.m_last_syscall = old_last_syscall;
 }
 
 IdManager& SysCallBase::GetIdManager() const

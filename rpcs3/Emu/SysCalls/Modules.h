@@ -6,15 +6,36 @@
 
 class Module;
 
+// flags set in ModuleFunc
+enum : u32
+{
+	MFF_FORCED_HLE = (1 << 0), // always call HLE function
+};
+
+// flags passed with index
+enum : u32
+{
+	EIF_SAVE_RTOC   = (1 << 25), // save RTOC in [SP+0x28] before calling HLE/LLE function
+	EIF_PERFORM_BLR = (1 << 24), // do BLR after calling HLE/LLE function
+
+	EIF_FLAGS = 0x3000000, // all flags
+};
+
 struct ModuleFunc
 {
 	u32 id;
+	u32 flags;
 	Module* module;
-	std::shared_ptr<func_caller> func;
+	ppu_func_caller func;
 	vm::ptr<void()> lle_func;
 
-	ModuleFunc(u32 id, Module* module, func_caller* func, vm::ptr<void()> lle_func = vm::ptr<void()>::make(0))
+	ModuleFunc()
+	{
+	}
+
+	ModuleFunc(u32 id, u32 flags, Module* module, ppu_func_caller func, vm::ptr<void()> lle_func = vm::ptr<void()>::make(0))
 		: id(id)
+		, flags(flags)
 		, module(module)
 		, func(func)
 		, lle_func(lle_func)
@@ -28,22 +49,14 @@ struct SFuncOp
 	u32 mask;
 };
 
-struct SFunc
+struct StaticFunc
 {
-	func_caller* func;
-	void* ptr;
+	u32 index;
 	const char* name;
 	std::vector<SFuncOp> ops;
 	u64 group;
 	u32 found;
-
-	~SFunc()
-	{
-		delete func;
-	}
 };
-
-class StaticFuncManager;
 
 class Module : public LogBase
 {
@@ -52,7 +65,6 @@ class Module : public LogBase
 	void(*m_init)();
 
 	IdManager& GetIdManager() const;
-	void PushNewFuncSub(SFunc* func);
 
 	Module() = delete;
 
@@ -116,67 +128,27 @@ public:
 	}
 
 	bool RemoveId(u32 id);
-
-	template<typename T> __forceinline void AddFunc(u32 id, T func);
-	template<typename T> __forceinline void AddFunc(const char* name, T func);
-	template<typename T> __forceinline void AddFuncSub(const char group[8], const u64 ops[], const char* name, T func);
 };
 
-u32 add_ps3_func(ModuleFunc func);
-ModuleFunc* get_ps3_func_by_nid(u32 nid, u32* out_index = nullptr);
-ModuleFunc* get_ps3_func_by_index(u32 index);
-void execute_ps3_func_by_index(PPUThread& CPU, u32 id);
-void clear_ps3_functions();
+u32 add_ppu_func(ModuleFunc func);
+ModuleFunc* get_ppu_func_by_nid(u32 nid, u32* out_index = nullptr);
+ModuleFunc* get_ppu_func_by_index(u32 index);
+void execute_ppu_func_by_index(PPUThread& CPU, u32 id);
+void clear_ppu_functions();
 u32 get_function_id(const char* name);
 
-template<typename T>
-__forceinline void Module::AddFunc(u32 id, T func)
-{
-	add_ps3_func(ModuleFunc(id, this, bind_func(func)));
-}
+u32 add_ppu_func_sub(StaticFunc sf);
+u32 add_ppu_func_sub(const char group[8], const u64 ops[], const char* name, Module* module, ppu_func_caller func);
 
-template<typename T>
-__forceinline void Module::AddFunc(const char* name, T func)
-{
-	AddFunc(get_function_id(name), func);
-}
+void hook_ppu_funcs(u32* base, u32 size);
 
-template<typename T>
-__forceinline void Module::AddFuncSub(const char group[8], const u64 ops[], const char* name, T func)
-{
-	if (!ops[0]) return;
+#define REG_FUNC(module, name) add_ppu_func(ModuleFunc(get_function_id(#name), 0, &module, bind_func(name)))
+#define REG_FUNC_FH(module, name) add_ppu_func(ModuleFunc(get_function_id(#name), MFF_FORCED_HLE, &module, bind_func(name)))
 
-	SFunc* sf = new SFunc;
-	sf->ptr = (void *)func;
-	sf->func = bind_func(func);
-	sf->name = name;
-	sf->group = *(u64*)group;
-	sf->found = 0;
-
-	// TODO: check for self-inclusions, use CRC
-	for (u32 i = 0; ops[i]; i++)
-	{
-		SFuncOp op;
-		op.mask = ops[i] >> 32;
-		op.crc = (u32)ops[i];
-		if (op.mask) op.crc &= op.mask;
-		op.mask = re32(op.mask);
-		op.crc = re32(op.crc);
-		sf->ops.push_back(op);
-	}
-	PushNewFuncSub(sf);
-}
-
-void fix_import(Module* module, u32 nid, u32 addr);
-
-#define FIX_IMPORT(module, func, addr) fix_import(module, get_function_id(#func), addr)
-
-void fix_relocs(Module* module, u32 lib, u32 start, u32 end, u32 seg2);
+#define REG_UNNAMED(module, nid) add_ppu_func(ModuleFunc(0x##nid, 0, &module, bind_func(_nid_##nid)))
 
 #define REG_SUB(module, group, name, ...) \
 	static const u64 name ## _table[] = {__VA_ARGS__ , 0}; \
-	module.AddFuncSub(group, name ## _table, #name, name)
-
-#define REG_FUNC(module, name) module.AddFunc(get_function_id(#name), name)
+	if (name ## _table[0]) add_ppu_func_sub(group, name ## _table, #name, &module, bind_func(name))
 
 #define UNIMPLEMENTED_FUNC(module) module.Error("%s", __FUNCTION__)

@@ -37,6 +37,8 @@
     <ClCompile Include="..\Utilities\SSemaphore.cpp" />
     <ClCompile Include="..\Utilities\StrFmt.cpp" />
     <ClCompile Include="..\Utilities\Thread.cpp" />
+    <ClCompile Include="Emu\RSX\CgBinaryFragmentProgram.cpp" />
+    <ClCompile Include="Emu\RSX\CgBinaryVertexProgram.cpp" />
     <ClCompile Include="Emu\SysCalls\Modules\cellSpursSpu.cpp" />
     <ClCompile Include="Crypto\aes.cpp" />
     <ClCompile Include="Crypto\ec.cpp" />
@@ -278,7 +280,6 @@
     <ClCompile Include="Emu\SysCalls\Modules\sys_http.cpp" />
     <ClCompile Include="Emu\SysCalls\Modules\sys_io.cpp" />
     <ClCompile Include="Emu\SysCalls\Modules\sys_net.cpp" />
-    <ClCompile Include="Emu\SysCalls\Static.cpp" />
     <ClCompile Include="Emu\SysCalls\SyncPrimitivesManager.cpp" />
     <ClCompile Include="Emu\SysCalls\SysCalls.cpp" />
     <ClCompile Include="Emu\System.cpp" />
@@ -410,6 +411,7 @@
     <ClInclude Include="Emu\Memory\Memory.h" />
     <ClInclude Include="Emu\Memory\MemoryBlock.h" />
     <ClInclude Include="Emu\Memory\atomic_type.h" />
+    <ClInclude Include="Emu\RSX\CgBinaryProgram.h" />
     <ClInclude Include="Emu\RSX\GCM.h" />
     <ClInclude Include="Emu\RSX\GL\GLBuffers.h" />
     <ClInclude Include="Emu\RSX\GL\GLFragmentProgram.h" />
@@ -486,7 +488,10 @@
     <ClInclude Include="Emu\SysCalls\Modules\cellPngDec.h" />
     <ClInclude Include="Emu\SysCalls\Modules\cellResc.h" />
     <ClInclude Include="Emu\SysCalls\Modules\cellRtc.h" />
+    <ClInclude Include="Emu\SysCalls\Modules\cellRudp.h" />
     <ClInclude Include="Emu\SysCalls\Modules\cellSail.h" />
+    <ClInclude Include="Emu\SysCalls\Modules\cellScreenshot.h" />
+    <ClInclude Include="Emu\SysCalls\Modules\cellSearch.h" />
     <ClInclude Include="Emu\SysCalls\Modules\cellSpurs.h" />
     <ClInclude Include="Emu\SysCalls\Modules\cellSpursJq.h" />
     <ClInclude Include="Emu\SysCalls\Modules\cellSubdisplay.h" />
@@ -494,6 +499,7 @@
     <ClInclude Include="Emu\SysCalls\Modules\cellSync2.h" />
     <ClInclude Include="Emu\SysCalls\Modules\cellSysutil.h" />
     <ClInclude Include="Emu\SysCalls\Modules\cellSaveData.h" />
+    <ClInclude Include="Emu\SysCalls\Modules\cellUsbd.h" />
     <ClInclude Include="Emu\SysCalls\Modules\cellUserInfo.h" />
     <ClInclude Include="Emu\SysCalls\Modules\cellVdec.h" />
     <ClInclude Include="Emu\SysCalls\Modules\cellVpost.h" />
@@ -511,7 +517,6 @@
     <ClInclude Include="Emu\SysCalls\Modules\sysPrxForUser.h" />
     <ClInclude Include="Emu\SysCalls\Modules\sys_net.h" />
     <ClInclude Include="Emu\SysCalls\SC_FUNC.h" />
-    <ClInclude Include="Emu\SysCalls\Static.h" />
     <ClInclude Include="Emu\SysCalls\SyncPrimitivesManager.h" />
     <ClInclude Include="Emu\SysCalls\SysCalls.h" />
     <ClInclude Include="Emu\System.h" />

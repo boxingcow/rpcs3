@@ -9,22 +9,7 @@ u32 add_psv_func(psv_func data)
 {
 	for (auto& f : g_psv_func_list)
 	{
-		if (f.nid == data.nid)
-		{
-			const u32 index = (u32)(&f - g_psv_func_list.data());
-
-			if (index < SFI_MAX)
-			{
-				continue;
-			}
-
-			if (data.func)
-			{
-				f.func = data.func;
-			}
-		
-			return index;
-		}
+		assert(f.nid != data.nid || (&f - g_psv_func_list.data()) < SFI_MAX);
 	}
 
 	g_psv_func_list.push_back(data);
@@ -75,7 +60,7 @@ void execute_psv_func_by_index(ARMv7Context& context, u32 index)
 
 		if (func->func)
 		{
-			(*func->func)(context);
+			func->func(context);
 		}
 		else
 		{
@@ -223,10 +208,10 @@ void initialize_psv_modules()
 	psv_func& hle_return = g_psv_func_list[SFI_HLE_RETURN];
 	hle_return.nid = 0;
 	hle_return.name = "HLE_RETURN";
-	hle_return.func.reset(new psv_func_detail::func_binder<void, ARMv7Context&>([](ARMv7Context& context)
+	hle_return.func = [](ARMv7Context& context)
 	{
 		context.thread.FastStop();
-	}));
+	};
 
 	// load functions
 	for (auto module : g_psv_modules)

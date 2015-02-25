@@ -1081,7 +1081,7 @@ s32 syncLFQueueGetPushPointer(vm::ptr<CellSyncLFQueue> queue, s32& pointer, u32 
 
 s32 _cellSyncLFQueueGetPushPointer(vm::ptr<CellSyncLFQueue> queue, vm::ptr<u32> pointer, u32 isBlocking, u32 useEventQueue)
 {
-	cellSync.Todo("_cellSyncLFQueueGetPushPointer(queue_addr=0x%x, pointer_addr=0x%x, isBlocking=%d, useEventQueue=%d)",
+	cellSync.Warning("_cellSyncLFQueueGetPushPointer(queue_addr=0x%x, pointer_addr=0x%x, isBlocking=%d, useEventQueue=%d)",
 		queue.addr(), pointer.addr(), isBlocking, useEventQueue);
 
 	s32 pointer_value;
@@ -1243,7 +1243,7 @@ s32 syncLFQueueCompletePushPointer(vm::ptr<CellSyncLFQueue> queue, s32 pointer, 
 
 s32 _cellSyncLFQueueCompletePushPointer(vm::ptr<CellSyncLFQueue> queue, s32 pointer, vm::ptr<s32(u32 addr, u32 arg)> fpSendSignal)
 {
-	cellSync.Todo("_cellSyncLFQueueCompletePushPointer(queue_addr=0x%x, pointer=%d, fpSendSignal_addr=0x%x)",
+	cellSync.Warning("_cellSyncLFQueueCompletePushPointer(queue_addr=0x%x, pointer=%d, fpSendSignal_addr=0x%x)",
 		queue.addr(), pointer, fpSendSignal.addr());
 
 	return syncLFQueueCompletePushPointer(queue, pointer, fpSendSignal);
@@ -1432,7 +1432,7 @@ s32 syncLFQueueGetPopPointer(vm::ptr<CellSyncLFQueue> queue, s32& pointer, u32 i
 
 s32 _cellSyncLFQueueGetPopPointer(vm::ptr<CellSyncLFQueue> queue, vm::ptr<u32> pointer, u32 isBlocking, u32 arg4, u32 useEventQueue)
 {
-	cellSync.Todo("_cellSyncLFQueueGetPopPointer(queue_addr=0x%x, pointer_addr=0x%x, isBlocking=%d, arg4=%d, useEventQueue=%d)",
+	cellSync.Warning("_cellSyncLFQueueGetPopPointer(queue_addr=0x%x, pointer_addr=0x%x, isBlocking=%d, arg4=%d, useEventQueue=%d)",
 		queue.addr(), pointer.addr(), isBlocking, arg4, useEventQueue);
 
 	s32 pointer_value;
@@ -1594,7 +1594,7 @@ s32 syncLFQueueCompletePopPointer(vm::ptr<CellSyncLFQueue> queue, s32 pointer, c
 s32 _cellSyncLFQueueCompletePopPointer(vm::ptr<CellSyncLFQueue> queue, s32 pointer, vm::ptr<s32(u32 addr, u32 arg)> fpSendSignal, u32 noQueueFull)
 {
 	// arguments copied from _cellSyncLFQueueCompletePushPointer + unknown argument (noQueueFull taken from LFQueue2CompletePopPointer)
-	cellSync.Todo("_cellSyncLFQueueCompletePopPointer(queue_addr=0x%x, pointer=%d, fpSendSignal_addr=0x%x, noQueueFull=%d)",
+	cellSync.Warning("_cellSyncLFQueueCompletePopPointer(queue_addr=0x%x, pointer=%d, fpSendSignal_addr=0x%x, noQueueFull=%d)",
 		queue.addr(), pointer, fpSendSignal.addr(), noQueueFull);
 
 	return syncLFQueueCompletePopPointer(queue, pointer, fpSendSignal, noQueueFull);
@@ -1858,50 +1858,50 @@ s32 _cellSyncLFQueueDetachLv2EventQueue(vm::ptr<u32> spus, u32 num, vm::ptr<Cell
 
 Module cellSync("cellSync", []()
 {
-	cellSync.AddFunc(0xa9072dee, cellSyncMutexInitialize);
-	cellSync.AddFunc(0x1bb675c2, cellSyncMutexLock);
-	cellSync.AddFunc(0xd06918c4, cellSyncMutexTryLock);
-	cellSync.AddFunc(0x91f2b7b0, cellSyncMutexUnlock);
+	REG_FUNC(cellSync, cellSyncMutexInitialize);
+	REG_FUNC(cellSync, cellSyncMutexLock);
+	REG_FUNC(cellSync, cellSyncMutexTryLock);
+	REG_FUNC(cellSync, cellSyncMutexUnlock);
 
-	cellSync.AddFunc(0x07254fda, cellSyncBarrierInitialize);
-	cellSync.AddFunc(0xf06a6415, cellSyncBarrierNotify);
-	cellSync.AddFunc(0x268edd6d, cellSyncBarrierTryNotify);
-	cellSync.AddFunc(0x35f21355, cellSyncBarrierWait);
-	cellSync.AddFunc(0x6c272124, cellSyncBarrierTryWait);
+	REG_FUNC(cellSync, cellSyncBarrierInitialize);
+	REG_FUNC(cellSync, cellSyncBarrierNotify);
+	REG_FUNC(cellSync, cellSyncBarrierTryNotify);
+	REG_FUNC(cellSync, cellSyncBarrierWait);
+	REG_FUNC(cellSync, cellSyncBarrierTryWait);
 
-	cellSync.AddFunc(0xfc48b03f, cellSyncRwmInitialize);
-	cellSync.AddFunc(0xcece771f, cellSyncRwmRead);
-	cellSync.AddFunc(0xa6669751, cellSyncRwmTryRead);
-	cellSync.AddFunc(0xed773f5f, cellSyncRwmWrite);
-	cellSync.AddFunc(0xba5bee48, cellSyncRwmTryWrite);
+	REG_FUNC(cellSync, cellSyncRwmInitialize);
+	REG_FUNC(cellSync, cellSyncRwmRead);
+	REG_FUNC(cellSync, cellSyncRwmTryRead);
+	REG_FUNC(cellSync, cellSyncRwmWrite);
+	REG_FUNC(cellSync, cellSyncRwmTryWrite);
 
-	cellSync.AddFunc(0x3929948d, cellSyncQueueInitialize);
-	cellSync.AddFunc(0x5ae841e5, cellSyncQueuePush);
-	cellSync.AddFunc(0x705985cd, cellSyncQueueTryPush);
-	cellSync.AddFunc(0x4da6d7e0, cellSyncQueuePop);
-	cellSync.AddFunc(0xa58df87f, cellSyncQueueTryPop);
-	cellSync.AddFunc(0x48154c9b, cellSyncQueuePeek);
-	cellSync.AddFunc(0x68af923c, cellSyncQueueTryPeek);
-	cellSync.AddFunc(0x4da349b2, cellSyncQueueSize);
-	cellSync.AddFunc(0xa5362e73, cellSyncQueueClear);
+	REG_FUNC(cellSync, cellSyncQueueInitialize);
+	REG_FUNC(cellSync, cellSyncQueuePush);
+	REG_FUNC(cellSync, cellSyncQueueTryPush);
+	REG_FUNC(cellSync, cellSyncQueuePop);
+	REG_FUNC(cellSync, cellSyncQueueTryPop);
+	REG_FUNC(cellSync, cellSyncQueuePeek);
+	REG_FUNC(cellSync, cellSyncQueueTryPeek);
+	REG_FUNC(cellSync, cellSyncQueueSize);
+	REG_FUNC(cellSync, cellSyncQueueClear);
 
-	cellSync.AddFunc(0x0c7cb9f7, cellSyncLFQueueGetEntrySize);
-	cellSync.AddFunc(0x167ea63e, cellSyncLFQueueSize);
-	cellSync.AddFunc(0x2af0c515, cellSyncLFQueueClear);
-	cellSync.AddFunc(0x35bbdad2, _cellSyncLFQueueCompletePushPointer2);
-	cellSync.AddFunc(0x46356fe0, _cellSyncLFQueueGetPopPointer2);
-	cellSync.AddFunc(0x4e88c68d, _cellSyncLFQueueCompletePushPointer);
-	cellSync.AddFunc(0x54fc2032, _cellSyncLFQueueAttachLv2EventQueue);
-	cellSync.AddFunc(0x6bb4ef9d, _cellSyncLFQueueGetPushPointer2);
-	cellSync.AddFunc(0x74c37666, _cellSyncLFQueueGetPopPointer);
-	cellSync.AddFunc(0x7a51deee, _cellSyncLFQueueCompletePopPointer2);
-	cellSync.AddFunc(0x811d148e, _cellSyncLFQueueDetachLv2EventQueue);
-	cellSync.AddFunc(0xaa355278, cellSyncLFQueueInitialize);
-	cellSync.AddFunc(0xaff7627a, _cellSyncLFQueueGetSignalAddress);
-	cellSync.AddFunc(0xba5961ca, _cellSyncLFQueuePushBody);
-	cellSync.AddFunc(0xd59aa307, cellSyncLFQueueGetDirection);
-	cellSync.AddFunc(0xe18c273c, cellSyncLFQueueDepth);
-	cellSync.AddFunc(0xe1bc7add, _cellSyncLFQueuePopBody);
-	cellSync.AddFunc(0xe9bf2110, _cellSyncLFQueueGetPushPointer);
-	cellSync.AddFunc(0xfe74e8e7, _cellSyncLFQueueCompletePopPointer);
+	REG_FUNC(cellSync, cellSyncLFQueueGetEntrySize);
+	REG_FUNC(cellSync, cellSyncLFQueueSize);
+	REG_FUNC(cellSync, cellSyncLFQueueClear);
+	REG_FUNC(cellSync, _cellSyncLFQueueCompletePushPointer2);
+	REG_FUNC(cellSync, _cellSyncLFQueueGetPopPointer2);
+	REG_FUNC(cellSync, _cellSyncLFQueueCompletePushPointer);
+	REG_FUNC(cellSync, _cellSyncLFQueueAttachLv2EventQueue);
+	REG_FUNC(cellSync, _cellSyncLFQueueGetPushPointer2);
+	REG_FUNC(cellSync, _cellSyncLFQueueGetPopPointer);
+	REG_FUNC(cellSync, _cellSyncLFQueueCompletePopPointer2);
+	REG_FUNC(cellSync, _cellSyncLFQueueDetachLv2EventQueue);
+	REG_FUNC(cellSync, cellSyncLFQueueInitialize);
+	REG_FUNC(cellSync, _cellSyncLFQueueGetSignalAddress);
+	REG_FUNC(cellSync, _cellSyncLFQueuePushBody);
+	REG_FUNC(cellSync, cellSyncLFQueueGetDirection);
+	REG_FUNC(cellSync, cellSyncLFQueueDepth);
+	REG_FUNC(cellSync, _cellSyncLFQueuePopBody);
+	REG_FUNC(cellSync, _cellSyncLFQueueGetPushPointer);
+	REG_FUNC(cellSync, _cellSyncLFQueueCompletePopPointer);
 });
