@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "Emu/Memory/Memory.h"
 #include "Emu/System.h"
+#include "Emu/IdManager.h"
 #include "Emu/SysCalls/Modules.h"
 #include "Emu/SysCalls/CB_FUNC.h"
 
@@ -301,11 +302,11 @@ u32 dmuxOpen(Demuxer* dmux_ptr)
 	std::shared_ptr<Demuxer> sptr(dmux_ptr);
 	Demuxer& dmux = *dmux_ptr;
 
-	u32 dmux_id = cellDmux.GetNewId(sptr);
+	u32 dmux_id = Emu.GetIdManager().GetNewID(sptr);
 
 	dmux.id = dmux_id;
 
-	dmux.dmuxCb = (PPUThread*)&Emu.GetCPU().AddThread(CPU_THREAD_PPU);
+	dmux.dmuxCb = static_cast<PPUThread*>(Emu.GetCPU().AddThread(CPU_THREAD_PPU).get());
 	dmux.dmuxCb->SetName(fmt::format("Demuxer[%d] Callback", dmux_id));
 	dmux.dmuxCb->SetEntry(0);
 	dmux.dmuxCb->SetPrio(1001);
@@ -346,12 +347,18 @@ u32 dmuxOpen(Demuxer* dmux_ptr)
 				if (!stream.peek(code)) 
 				{
 					// demuxing finished
+					dmux.is_running = false;
+
+					// callback
 					auto dmuxMsg = vm::ptr<CellDmuxMsg>::make(dmux.memAddr + (cb_add ^= 16));
 					dmuxMsg->msgType = CELL_DMUX_MSG_TYPE_DEMUX_DONE;
 					dmuxMsg->supplementalInfo = stream.userdata;
 					dmux.cbFunc(*dmux.dmuxCb, dmux.id, dmuxMsg, dmux.cbArg);
 
-					dmux.is_running = false;
+					dmux.is_working = false;
+
+					stream = {};
+					
 					continue;
 				}
 				
@@ -633,16 +640,20 @@ u32 dmuxOpen(Demuxer* dmux_ptr)
 			case dmuxResetStream:
 			case dmuxResetStreamAndWaitDone:
 			{
-				auto dmuxMsg = vm::ptr<CellDmuxMsg>::make(dmux.memAddr + (cb_add ^= 16));
-				dmuxMsg->msgType = CELL_DMUX_MSG_TYPE_DEMUX_DONE;
-				dmuxMsg->supplementalInfo = stream.userdata;
-				dmux.cbFunc(*dmux.dmuxCb, dmux.id, dmuxMsg, dmux.cbArg);
+				// demuxing stopped
+				if (dmux.is_running.exchange(false))
+				{
+					// callback
+					auto dmuxMsg = vm::ptr<CellDmuxMsg>::make(dmux.memAddr + (cb_add ^= 16));
+					dmuxMsg->msgType = CELL_DMUX_MSG_TYPE_DEMUX_DONE;
+					dmuxMsg->supplementalInfo = stream.userdata;
+					dmux.cbFunc(*dmux.dmuxCb, dmux.id, dmuxMsg, dmux.cbArg);
 
-				stream = {};
-				dmux.is_running = false;
-				//if (task.type == dmuxResetStreamAndWaitDone)
-				//{
-				//}
+					stream = {};
+
+					dmux.is_working = false;
+				}
+
 				break;
 			}
 
@@ -925,8 +936,16 @@ int cellDmuxResetStreamAndWaitDone(u32 demuxerHandle)
 		return CELL_DMUX_ERROR_ARG;
 	}
 
+	if (!dmux->is_running)
+	{
+		return CELL_OK;
+	}
+
+	dmux->is_working = true;
+
 	dmux->job.push(DemuxerTask(dmuxResetStreamAndWaitDone), &dmux->is_closed);
-	while (dmux->is_running && !dmux->is_closed) // TODO: ensure that it is safe
+
+	while (dmux->is_running && dmux->is_working && !dmux->is_closed) // TODO: ensure that it is safe
 	{
 		if (Emu.IsStopped())
 		{
@@ -935,6 +954,7 @@ int cellDmuxResetStreamAndWaitDone(u32 demuxerHandle)
 		}
 		std::this_thread::sleep_for(std::chrono::milliseconds(1)); // hack
 	}
+
 	return CELL_OK;
 }
 
@@ -990,7 +1010,7 @@ int cellDmuxEnableEs(u32 demuxerHandle, vm::ptr<const CellCodecEsFilterId> esFil
 		esFilterId->filterIdMajor, esFilterId->filterIdMinor, esFilterId->supplementalInfo1, esFilterId->supplementalInfo2,
 		esCb->cbEsMsgFunc.to_le(), esCb->cbArg, esSpecificInfo_addr));
 
-	u32 id = cellDmux.GetNewId(es);
+	u32 id = Emu.GetIdManager().GetNewID(es);
 	es->id = id;
 	*esHandle = id;
 

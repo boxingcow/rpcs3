@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "Utilities/Log.h"
+#include "Emu/System.h"
 #include "Emu/Cell/PPULLVMRecompiler.h"
 #include "Emu/Memory/Memory.h"
 #include "llvm/Support/TargetSelect.h"
@@ -22,6 +23,10 @@
 
 using namespace llvm;
 using namespace ppu_recompiler_llvm;
+
+#ifdef ID_MANAGER_INCLUDED
+#error "ID Manager cannot be used in this module"
+#endif
 
 u64  Compiler::s_rotate_mask[64][64];
 bool Compiler::s_rotate_mask_inited = false;
@@ -1999,7 +2004,29 @@ void Compiler::BC(u32 bo, u32 bi, s32 bd, u32 aa, u32 lk) {
 }
 
 void Compiler::HACK(u32 index) {
-    Call<void>("execute_ppu_func_by_index", &execute_ppu_func_by_index, m_state.args[CompileTaskState::Args::State], m_ir_builder->getInt32(index));
+    if (index & EIF_SAVE_RTOC) {
+        auto addr_i64 = (Value *)m_ir_builder->getInt64(0x28);
+        auto ra_i64 = GetGpr(1);
+        addr_i64 = m_ir_builder->CreateAdd(ra_i64, addr_i64);
+
+        WriteMemory(addr_i64, GetGpr(2, 64));
+    }
+    Call<void>("execute_ppu_func_by_index", &execute_ppu_func_by_index, m_state.args[CompileTaskState::Args::State], m_ir_builder->getInt32(index & ~EIF_FLAGS));
+    if (index & EIF_PERFORM_BLR) {
+        auto lr_i64 = GetLr();
+        lr_i64 = m_ir_builder->CreateAnd(lr_i64, ~0x3ULL);
+        auto lr_i32 = m_ir_builder->CreateTrunc(lr_i64, m_ir_builder->getInt32Ty());
+        CreateBranch(nullptr, lr_i32, false, true);
+    }
+    // copied from Compiler::SC()
+    auto ret_i1   = Call<bool>("PollStatus", m_poll_status_function, m_state.args[CompileTaskState::Args::State]);
+    auto cmp_i1   = m_ir_builder->CreateICmpEQ(ret_i1, m_ir_builder->getInt1(true));
+    auto then_bb  = GetBasicBlockFromAddress(m_state.current_instruction_address, "then_true");
+    auto merge_bb = GetBasicBlockFromAddress(m_state.current_instruction_address, "merge_true");
+    m_ir_builder->CreateCondBr(cmp_i1, then_bb, merge_bb);
+    m_ir_builder->SetInsertPoint(then_bb);
+    m_ir_builder->CreateRet(m_ir_builder->getInt32(0xFFFFFFFF));
+    m_ir_builder->SetInsertPoint(merge_bb);
 }
 
 void Compiler::SC(u32 lev) {

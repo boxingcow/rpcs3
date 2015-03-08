@@ -2,12 +2,13 @@
 #include "Utilities/Log.h"
 #include "Emu/Memory/Memory.h"
 #include "Emu/System.h"
+#include "Emu/IdManager.h"
 #include "Emu/SysCalls/Modules.h"
 #include "Emu/SysCalls/CB_FUNC.h"
-#include "Emu/Memory/atomic_type.h"
 
 #include "Emu/FS/vfsFile.h"
-#include "Emu/SysCalls/lv2/sleep_queue_type.h"
+#include "Emu/SysCalls/lv2/sleep_queue.h"
+#include "Emu/SysCalls/lv2/sys_interrupt.h"
 #include "Emu/SysCalls/lv2/sys_spu.h"
 #include "Emu/SysCalls/lv2/sys_lwmutex.h"
 #include "Emu/SysCalls/lv2/sys_spinlock.h"
@@ -226,7 +227,7 @@ int _sys_heap_create_heap(const u32 heap_addr, const u32 align, const u32 size)
 	sysPrxForUser.Warning("_sys_heap_create_heap(heap_addr=0x%x, align=0x%x, size=0x%x)", heap_addr, align, size);
 
 	std::shared_ptr<HeapInfo> heap(new HeapInfo(heap_addr, align, size));
-	u32 heap_id = sysPrxForUser.GetNewId(heap);
+	u32 heap_id = Emu.GetIdManager().GetNewID(heap);
 	sysPrxForUser.Warning("*** sys_heap created: id = %d", heap_id);
 	return heap_id;
 }
@@ -236,7 +237,7 @@ u32 _sys_heap_malloc(const u32 heap_id, const u32 size)
 	sysPrxForUser.Warning("_sys_heap_malloc(heap_id=%d, size=0x%x)", heap_id, size);
 
 	std::shared_ptr<HeapInfo> heap;
-	if(!sysPrxForUser.CheckId(heap_id, heap)) return CELL_ESRCH;
+	if(!Emu.GetIdManager().GetIDData(heap_id, heap)) return CELL_ESRCH;
 
 	return (u32)Memory.Alloc(size, 1);
 }
@@ -246,7 +247,7 @@ u32 _sys_heap_memalign(u32 heap_id, u32 align, u32 size)
 	sysPrxForUser.Warning("_sys_heap_memalign(heap_id=%d, align=0x%x, size=0x%x)", heap_id, align, size);
 
 	std::shared_ptr<HeapInfo> heap;
-	if(!sysPrxForUser.CheckId(heap_id, heap)) return CELL_ESRCH;
+	if(!Emu.GetIdManager().GetIDData(heap_id, heap)) return CELL_ESRCH;
 
 	return (u32)Memory.Alloc(size, align);
 }
@@ -261,6 +262,13 @@ s64 _sys_process_at_Exitspawn()
 {
 	sysPrxForUser.Log("_sys_process_at_Exitspawn");
 	return CELL_OK;
+}
+
+s32 sys_interrupt_thread_disestablish(PPUThread& CPU, u32 ih)
+{
+	sysPrxForUser.Todo("sys_interrupt_thread_disestablish(ih=%d)", ih);
+
+	return _sys_interrupt_thread_disestablish(ih, vm::stackvar<u64>(CPU));
 }
 
 int sys_process_is_stack(u32 p)
@@ -329,7 +337,7 @@ int sys_raw_spu_load(s32 id, vm::ptr<const char> path, vm::ptr<u32> entry)
 	u32 _entry;
 	LoadSpuImage(f, _entry, RAW_SPU_BASE_ADDR + RAW_SPU_OFFSET * id);
 
-	*entry = _entry;
+	*entry = _entry | 1;
 
 	return CELL_OK;
 }
@@ -340,7 +348,7 @@ int sys_raw_spu_image_load(int id, vm::ptr<sys_spu_image> img)
 
 	// TODO: use segment info
 	memcpy(vm::get_ptr<void>(RAW_SPU_BASE_ADDR + RAW_SPU_OFFSET * id), vm::get_ptr<void>(img->addr), 256 * 1024);
-	vm::write32(RAW_SPU_BASE_ADDR + RAW_SPU_OFFSET * id + RAW_SPU_PROB_OFFSET + SPU_NPC_offs, (u32)img->entry_point);
+	vm::write32(RAW_SPU_BASE_ADDR + RAW_SPU_OFFSET * id + RAW_SPU_PROB_OFFSET + SPU_NPC_offs, img->entry_point | be_t<u32>::make(1));
 
 	return CELL_OK;
 }
@@ -597,6 +605,8 @@ Module sysPrxForUser("sysPrxForUser", []()
 	REG_FUNC(sysPrxForUser, _sys_process_atexitspawn);
 	REG_FUNC(sysPrxForUser, _sys_process_at_Exitspawn);
 	REG_FUNC(sysPrxForUser, sys_process_is_stack);
+
+	REG_FUNC(sysPrxForUser, sys_interrupt_thread_disestablish);
 
 	REG_FUNC(sysPrxForUser, sys_ppu_thread_create);
 	REG_FUNC(sysPrxForUser, sys_ppu_thread_get_id);

@@ -5,10 +5,9 @@
 #include "Emu/Memory/Memory.h"
 #include "Emu/System.h"
 #include "ModuleManager.h"
-#include "Emu/Memory/atomic_type.h"
 
 #include "lv2/cellFs.h"
-#include "lv2/sleep_queue_type.h"
+#include "lv2/sleep_queue.h"
 #include "lv2/sys_lwmutex.h"
 #include "lv2/sys_mutex.h"
 #include "lv2/sys_cond.h"
@@ -33,14 +32,6 @@
 #include "Emu/SysCalls/Modules/cellGcmSys.h"
 
 #include "SysCalls.h"
-
-namespace detail
-{
-	bool CheckIdID(u32 id, ID*& _id, const std::string &name)
-	{
-		return Emu.GetIdManager().CheckID(id) && (_id = &Emu.GetIdManager().GetID(id))->GetName() == name;
-	}
-}
 
 void null_func(PPUThread& CPU);
 
@@ -133,7 +124,7 @@ const ppu_func_caller sc_table[1024] =
 	bind_func(sys_event_flag_trywait),                      //86  (0x056)
 	bind_func(sys_event_flag_set),                          //87  (0x057)
 	bind_func(sys_interrupt_thread_eoi),                    //88  (0x058)
-	bind_func(sys_interrupt_thread_disestablish),           //89  (0x059)
+	bind_func(_sys_interrupt_thread_disestablish),           //89  (0x059)
 	bind_func(sys_semaphore_create),                        //90  (0x05A)
 	bind_func(sys_semaphore_destroy),                       //91  (0x05B)
 	bind_func(sys_semaphore_wait),                          //92  (0x05C)
@@ -952,14 +943,4 @@ void SysCalls::DoSyscall(PPUThread& CPU, u64 code)
 	}
 
 	CPU.m_last_syscall = old_last_syscall;
-}
-
-IdManager& SysCallBase::GetIdManager() const
-{
-	return Emu.GetIdManager();
-}
-
-bool SysCallBase::RemoveId(u32 id)
-{
-	return Emu.GetIdManager().RemoveID(id);
 }

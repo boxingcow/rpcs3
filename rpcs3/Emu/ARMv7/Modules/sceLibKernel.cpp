@@ -44,26 +44,25 @@ s32 sceKernelCreateThread(
 	s32 cpuAffinityMask,
 	vm::psv::ptr<const SceKernelThreadOptParam> pOptParam)
 {
-	sceLibKernel.Warning("sceKernelCreateThread(pName=0x%x, entry=0x%x, initPriority=%d, stackSize=0x%x, attr=0x%x, cpuAffinityMask=0x%x, pOptParam=0x%x)",
+	sceLibKernel.Warning("sceKernelCreateThread(pName=*0x%x, entry=*0x%x, initPriority=%d, stackSize=0x%x, attr=0x%x, cpuAffinityMask=0x%x, pOptParam=*0x%x)",
 		pName, entry, initPriority, stackSize, attr, cpuAffinityMask, pOptParam);
 
-	ARMv7Thread& new_thread = static_cast<ARMv7Thread&>(Emu.GetCPU().AddThread(CPU_THREAD_ARMv7));
+	auto t = Emu.GetCPU().AddThread(CPU_THREAD_ARMv7);
 
-	const auto id = new_thread.GetId();
-	new_thread.SetEntry(entry.addr());
-	new_thread.SetPrio(initPriority);
-	new_thread.SetStackSize(stackSize);
-	new_thread.SetName(pName.get_ptr());
+	auto& armv7 = static_cast<ARMv7Thread&>(*t);
 
-	sceLibKernel.Warning("*** New ARMv7 Thread [%s] (entry=0x%x): id -> 0x%x", pName.get_ptr(), entry, id);
+	armv7.SetEntry(entry.addr());
+	armv7.SetPrio(initPriority);
+	armv7.SetStackSize(stackSize);
+	armv7.SetName(pName.get_ptr());
+	armv7.Run();
 
-	new_thread.Run();
-	return id;
+	return armv7.GetId();
 }
 
 s32 sceKernelStartThread(s32 threadId, u32 argSize, vm::psv::ptr<const void> pArgBlock)
 {
-	sceLibKernel.Warning("sceKernelStartThread(threadId=0x%x, argSize=0x%x, pArgBlock=0x%x)", threadId, argSize, pArgBlock);
+	sceLibKernel.Warning("sceKernelStartThread(threadId=0x%x, argSize=0x%x, pArgBlock=*0x%x)", threadId, argSize, pArgBlock);
 
 	std::shared_ptr<CPUThread> t = Emu.GetCPU().GetThread(threadId, CPU_THREAD_ARMv7);
 
@@ -186,7 +185,7 @@ s32 sceKernelChangeCurrentThreadAttr(u32 clearAttr, u32 setAttr)
 
 s32 sceKernelGetThreadExitStatus(s32 threadId, vm::psv::ptr<s32> pExitStatus)
 {
-	sceLibKernel.Todo("sceKernelGetThreadExitStatus(threadId=0x%x, pExitStatus=0x%x)", threadId, pExitStatus);
+	sceLibKernel.Todo("sceKernelGetThreadExitStatus(threadId=0x%x, pExitStatus=*0x%x)", threadId, pExitStatus);
 
 	throw __FUNCTION__;
 }
@@ -207,21 +206,21 @@ s32 sceKernelCheckWaitableStatus()
 
 s32 sceKernelGetThreadInfo(s32 threadId, vm::psv::ptr<SceKernelThreadInfo> pInfo)
 {
-	sceLibKernel.Todo("sceKernelGetThreadInfo(threadId=0x%x, pInfo=0x%x)", threadId, pInfo);
+	sceLibKernel.Todo("sceKernelGetThreadInfo(threadId=0x%x, pInfo=*0x%x)", threadId, pInfo);
 
 	throw __FUNCTION__;
 }
 
 s32 sceKernelGetThreadRunStatus(vm::psv::ptr<SceKernelThreadRunStatus> pStatus)
 {
-	sceLibKernel.Todo("sceKernelGetThreadRunStatus(pStatus=0x%x)", pStatus);
+	sceLibKernel.Todo("sceKernelGetThreadRunStatus(pStatus=*0x%x)", pStatus);
 
 	throw __FUNCTION__;
 }
 
 s32 sceKernelGetSystemInfo(vm::psv::ptr<SceKernelSystemInfo> pInfo)
 {
-	sceLibKernel.Todo("sceKernelGetSystemInfo(pInfo=0x%x)", pInfo);
+	sceLibKernel.Todo("sceKernelGetSystemInfo(pInfo=*0x%x)", pInfo);
 
 	throw __FUNCTION__;
 }
@@ -263,7 +262,7 @@ s32 sceKernelDelayThreadCB(u32 usec)
 
 s32 sceKernelWaitThreadEnd(s32 threadId, vm::psv::ptr<s32> pExitStatus, vm::psv::ptr<u32> pTimeout)
 {
-	sceLibKernel.Warning("sceKernelWaitThreadEnd(threadId=0x%x, pExitStatus=0x%x, pTimeout=0x%x)", threadId, pExitStatus, pTimeout);
+	sceLibKernel.Warning("sceKernelWaitThreadEnd(threadId=0x%x, pExitStatus=*0x%x, pTimeout=*0x%x)", threadId, pExitStatus, pTimeout);
 
 	std::shared_ptr<CPUThread> t = Emu.GetCPU().GetThread(threadId, CPU_THREAD_ARMv7);
 
@@ -298,7 +297,7 @@ s32 sceKernelWaitThreadEnd(s32 threadId, vm::psv::ptr<s32> pExitStatus, vm::psv:
 
 s32 sceKernelWaitThreadEndCB(s32 threadId, vm::psv::ptr<s32> pExitStatus, vm::psv::ptr<u32> pTimeout)
 {
-	sceLibKernel.Todo("sceKernelWaitThreadEndCB(threadId=0x%x, pExitStatus=0x%x, pTimeout=0x%x)", threadId, pExitStatus, pTimeout);
+	sceLibKernel.Todo("sceKernelWaitThreadEndCB(threadId=0x%x, pExitStatus=*0x%x, pTimeout=*0x%x)", threadId, pExitStatus, pTimeout);
 
 	throw __FUNCTION__;
 }
@@ -396,13 +395,14 @@ s32 sceKernelWaitMultipleEventsCB(vm::psv::ptr<SceKernelWaitEvent> pWaitEventLis
 
 s32 sceKernelCreateEventFlag(vm::psv::ptr<const char> pName, u32 attr, u32 initPattern, vm::psv::ptr<const SceKernelEventFlagOptParam> pOptParam)
 {
-	sceLibKernel.Error("sceKernelCreateEventFlag(pName=0x%x, attr=0x%x, initPattern=0x%x, pOptParam=0x%x)", pName, attr, initPattern, pOptParam);
+	sceLibKernel.Error("sceKernelCreateEventFlag(pName=*0x%x, attr=0x%x, initPattern=0x%x, pOptParam=*0x%x)", pName, attr, initPattern, pOptParam);
 
-	std::shared_ptr<psv_event_flag_t> ef(new psv_event_flag_t(pName.get_ptr(), attr, initPattern));
+	if (s32 id = g_psv_ef_list.add(new psv_event_flag_t(pName.get_ptr(), attr, initPattern), 0))
+	{
+		return id;
+	}
 
-	const s32 id = g_psv_ef_list.add(ef);
-
-	return id;
+	RETURN_ERROR(SCE_KERNEL_ERROR_ERROR);
 }
 
 s32 sceKernelDeleteEventFlag(s32 evfId)
@@ -459,25 +459,33 @@ s32 sceKernelGetEventFlagInfo(s32 evfId, vm::psv::ptr<SceKernelEventFlagInfo> pI
 
 s32 sceKernelCreateSema(vm::psv::ptr<const char> pName, u32 attr, s32 initCount, s32 maxCount, vm::psv::ptr<const SceKernelSemaOptParam> pOptParam)
 {
-	sceLibKernel.Error("sceKernelCreateSema(pName=0x%x, attr=0x%x, initCount=%d, maxCount=%d, pOptParam=0x%x)", pName, attr, initCount, maxCount, pOptParam);
+	sceLibKernel.Error("sceKernelCreateSema(pName=*0x%x, attr=0x%x, initCount=%d, maxCount=%d, pOptParam=*0x%x)", pName, attr, initCount, maxCount, pOptParam);
 
-	std::shared_ptr<psv_sema_t> sema(new psv_sema_t(pName.get_ptr(), attr, initCount, maxCount));
+	if (s32 id = g_psv_sema_list.add(new psv_sema_t(pName.get_ptr(), attr, initCount, maxCount), 0))
+	{
+		return id;
+	}
 
-	const s32 id = g_psv_sema_list.add(sema);
-
-	return id;
+	RETURN_ERROR(SCE_KERNEL_ERROR_ERROR);
 }
 
 s32 sceKernelDeleteSema(s32 semaId)
 {
 	sceLibKernel.Error("sceKernelDeleteSema(semaId=0x%x)", semaId);
 
+	ref_t<psv_sema_t> sema = g_psv_sema_list.get(semaId);
+
+	if (!sema)
+	{
+		RETURN_ERROR(SCE_KERNEL_ERROR_INVALID_UID);
+	}
+
 	if (!g_psv_sema_list.remove(semaId))
 	{
 		RETURN_ERROR(SCE_KERNEL_ERROR_INVALID_UID);
 	}
 
-	throw SCE_OK;
+	return SCE_OK;
 }
 
 s32 sceKernelOpenSema(vm::psv::ptr<const char> pName)
@@ -492,7 +500,18 @@ s32 sceKernelCloseSema(s32 semaId)
 
 s32 sceKernelWaitSema(s32 semaId, s32 needCount, vm::psv::ptr<u32> pTimeout)
 {
-	throw __FUNCTION__;
+	sceLibKernel.Error("sceKernelWaitSema(semaId=0x%x, needCount=%d, pTimeout=*0x%x)", semaId, needCount, pTimeout);
+
+	ref_t<psv_sema_t> sema = g_psv_sema_list.get(semaId);
+
+	if (!sema)
+	{
+		RETURN_ERROR(SCE_KERNEL_ERROR_INVALID_UID);
+	}
+
+	sceLibKernel.Error("*** name = %s", sema->name);
+	Emu.Pause();
+	return SCE_OK;
 }
 
 s32 sceKernelWaitSemaCB(s32 semaId, s32 needCount, vm::psv::ptr<u32> pTimeout)
@@ -524,13 +543,14 @@ s32 sceKernelGetSemaInfo(s32 semaId, vm::psv::ptr<SceKernelSemaInfo> pInfo)
 
 s32 sceKernelCreateMutex(vm::psv::ptr<const char> pName, u32 attr, s32 initCount, vm::psv::ptr<const SceKernelMutexOptParam> pOptParam)
 {
-	sceLibKernel.Error("sceKernelCreateMutex(pName=0x%x, attr=0x%x, initCount=%d, pOptParam=0x%x)", pName, attr, initCount, pOptParam);
+	sceLibKernel.Error("sceKernelCreateMutex(pName=*0x%x, attr=0x%x, initCount=%d, pOptParam=*0x%x)", pName, attr, initCount, pOptParam);
 
-	std::shared_ptr<psv_mutex_t> mutex(new psv_mutex_t(pName.get_ptr(), attr, initCount));
+	if (s32 id = g_psv_mutex_list.add(new psv_mutex_t(pName.get_ptr(), attr, initCount), 0))
+	{
+		return id;
+	}
 
-	const s32 id = g_psv_mutex_list.add(mutex);
-
-	return id;
+	RETURN_ERROR(SCE_KERNEL_ERROR_ERROR);
 }
 
 s32 sceKernelDeleteMutex(s32 mutexId)
@@ -624,13 +644,14 @@ s32 sceKernelGetLwMutexInfoById(s32 lwMutexId, vm::psv::ptr<SceKernelLwMutexInfo
 
 s32 sceKernelCreateCond(vm::psv::ptr<const char> pName, u32 attr, s32 mutexId, vm::psv::ptr<const SceKernelCondOptParam> pOptParam)
 {
-	sceLibKernel.Error("sceKernelCreateCond(pName=0x%x, attr=0x%x, mutexId=0x%x, pOptParam=0x%x)", pName, attr, mutexId, pOptParam);
+	sceLibKernel.Error("sceKernelCreateCond(pName=*0x%x, attr=0x%x, mutexId=0x%x, pOptParam=*0x%x)", pName, attr, mutexId, pOptParam);
 
-	std::shared_ptr<psv_cond_t> cond(new psv_cond_t(pName.get_ptr(), attr, mutexId));
+	if (s32 id = g_psv_cond_list.add(new psv_cond_t(pName.get_ptr(), attr, mutexId), 0))
+	{
+		return id;
+	}
 
-	const s32 id = g_psv_cond_list.add(cond);
-
-	return id;
+	RETURN_ERROR(SCE_KERNEL_ERROR_ERROR);
 }
 
 s32 sceKernelDeleteCond(s32 condId)

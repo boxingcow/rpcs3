@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "Emu/Memory/Memory.h"
 #include "Emu/System.h"
+#include "Emu/IdManager.h"
 #include "Emu/SysCalls/Modules.h"
 #include "Emu/SysCalls/CB_FUNC.h"
 
@@ -219,11 +220,11 @@ u32 adecOpen(AudioDecoder* adec_ptr)
 	std::shared_ptr<AudioDecoder> sptr(adec_ptr);
 	AudioDecoder& adec = *adec_ptr;
 
-	u32 adec_id = cellAdec.GetNewId(sptr);
+	u32 adec_id = Emu.GetIdManager().GetNewID(sptr);
 
 	adec.id = adec_id;
 
-	adec.adecCb = (PPUThread*)&Emu.GetCPU().AddThread(CPU_THREAD_PPU);
+	adec.adecCb = static_cast<PPUThread*>(Emu.GetCPU().AddThread(CPU_THREAD_PPU).get());
 	adec.adecCb->SetName(fmt::format("AudioDecoder[%d] Callback", adec_id));
 	adec.adecCb->SetEntry(0);
 	adec.adecCb->SetPrio(1001);

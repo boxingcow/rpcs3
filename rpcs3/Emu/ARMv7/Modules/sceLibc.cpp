@@ -150,9 +150,9 @@ namespace sce_libc_func
 {
 	void __cxa_atexit(vm::psv::ptr<atexit_func_t> func, vm::psv::ptr<void> arg, vm::psv::ptr<void> dso)
 	{
-		sceLibc.Warning("__cxa_atexit(func=0x%x, arg=0x%x, dso=0x%x)", func, arg, dso);
+		sceLibc.Warning("__cxa_atexit(func=*0x%x, arg=*0x%x, dso=*0x%x)", func, arg, dso);
 		
-		LV2_LOCK(0);
+		LV2_LOCK;
 
 		g_atexit.insert(g_atexit.begin(), [func, arg, dso](ARMv7Context& context)
 		{
@@ -162,9 +162,9 @@ namespace sce_libc_func
 
 	void __aeabi_atexit(vm::psv::ptr<void> arg, vm::psv::ptr<atexit_func_t> func, vm::psv::ptr<void> dso)
 	{
-		sceLibc.Warning("__aeabi_atexit(arg=0x%x, func=0x%x, dso=0x%x)", arg, func, dso);
+		sceLibc.Warning("__aeabi_atexit(arg=*0x%x, func=*0x%x, dso=*0x%x)", arg, func, dso);
 
-		LV2_LOCK(0);
+		LV2_LOCK;
 
 		g_atexit.insert(g_atexit.begin(), [func, arg, dso](ARMv7Context& context)
 		{
@@ -176,7 +176,7 @@ namespace sce_libc_func
 	{
 		sceLibc.Warning("exit()");
 		
-		LV2_LOCK(0);
+		LV2_LOCK;
 
 		for (auto func : g_atexit)
 		{
@@ -195,7 +195,7 @@ namespace sce_libc_func
 
 	void printf(ARMv7Context& context, vm::psv::ptr<const char> fmt) // va_args...
 	{
-		sceLibc.Warning("printf(fmt=0x%x)", fmt);
+		sceLibc.Warning("printf(fmt=*0x%x)", fmt);
 		sceLibc.Log("*** *fmt = '%s'", fmt.get_ptr());
 
 		const std::string& result = armv7_fmt(context, fmt, 1, 0, 0);
@@ -206,7 +206,7 @@ namespace sce_libc_func
 
 	void sprintf(ARMv7Context& context, vm::psv::ptr<char> str, vm::psv::ptr<const char> fmt) // va_args...
 	{
-		sceLibc.Warning("sprintf(str=0x%x, fmt=0x%x)", str, fmt);
+		sceLibc.Warning("sprintf(str=*0x%x, fmt=*0x%x)", str, fmt);
 		sceLibc.Log("*** *fmt = '%s'", fmt.get_ptr());
 
 		const std::string& result = armv7_fmt(context, fmt, 2, 0, 0);
@@ -217,28 +217,28 @@ namespace sce_libc_func
 
 	void __cxa_set_dso_handle_main(vm::psv::ptr<void> dso)
 	{
-		sceLibc.Warning("__cxa_set_dso_handle_main(dso=0x%x)", dso);
+		sceLibc.Warning("__cxa_set_dso_handle_main(dso=*0x%x)", dso);
 
 		g_dso = dso;
 	}
 
 	void memcpy(vm::psv::ptr<void> dst, vm::psv::ptr<const void> src, u32 size)
 	{
-		sceLibc.Warning("memcpy(dst=0x%x, src=0x%x, size=0x%x)", dst, src, size);
+		sceLibc.Warning("memcpy(dst=*0x%x, src=*0x%x, size=0x%x)", dst, src, size);
 
 		::memcpy(dst.get_ptr(), src.get_ptr(), size);
 	}
 
 	void memset(vm::psv::ptr<void> dst, s32 value, u32 size)
 	{
-		sceLibc.Warning("memset(dst=0x%x, value=%d, size=0x%x)", dst, value, size);
+		sceLibc.Warning("memset(dst=*0x%x, value=%d, size=0x%x)", dst, value, size);
 
 		::memset(dst.get_ptr(), value, size);
 	}
 
 	void _Assert(ARMv7Context& context, vm::psv::ptr<const char> text, vm::psv::ptr<const char> func)
 	{
-		sceLibc.Error("_Assert(text=0x%x, func=0x%x)", text, func);
+		sceLibc.Error("_Assert(text=*0x%x, func=*0x%x)", text, func);
 
 		LOG_ERROR(TTY, "%s : %s\n", func.get_ptr(), text.get_ptr());
 		LOG_NOTICE(ARMv7, context.thread.RegsToString());

@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "Emu/Memory/Memory.h"
 #include "Emu/System.h"
+#include "Emu/IdManager.h"
 #include "Emu/SysCalls/Modules.h"
 #include "Emu/SysCalls/CB_FUNC.h"
 
@@ -209,11 +210,11 @@ u32 vdecOpen(VideoDecoder* vdec_ptr)
 	std::shared_ptr<VideoDecoder> sptr(vdec_ptr);
 	VideoDecoder& vdec = *vdec_ptr;
 
-	u32 vdec_id = cellVdec.GetNewId(sptr);
+	u32 vdec_id = Emu.GetIdManager().GetNewID(sptr);
 
 	vdec.id = vdec_id;
 
-	vdec.vdecCb = (PPUThread*)&Emu.GetCPU().AddThread(CPU_THREAD_PPU);
+	vdec.vdecCb = static_cast<PPUThread*>(Emu.GetCPU().AddThread(CPU_THREAD_PPU).get());
 	vdec.vdecCb->SetName(fmt::format("VideoDecoder[%d] Callback", vdec_id));
 	vdec.vdecCb->SetEntry(0);
 	vdec.vdecCb->SetPrio(1001);

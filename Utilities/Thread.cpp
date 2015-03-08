@@ -2,7 +2,9 @@
 #include "Log.h"
 #include "rpcs3/Ini.h"
 #include "Emu/System.h"
+#include "Emu/CPU/CPUThreadManager.h"
 #include "Emu/CPU/CPUThread.h"
+#include "Emu/Cell/RawSPUThread.h"
 #include "Emu/SysCalls/SysCalls.h"
 #include "Thread.h"
 
@@ -105,8 +107,8 @@ enum x64_reg_t : u32
 enum x64_op_t : u32
 {
 	X64OP_NONE,
-	X64OP_LOAD, // obtain and put the value into x64 register (from Memory.ReadMMIO32, for example)
-	X64OP_STORE, // take the value from x64 register or an immediate and use it (pass in Memory.WriteMMIO32, for example)
+	X64OP_LOAD, // obtain and put the value into x64 register
+	X64OP_STORE, // take the value from x64 register or an immediate and use it
 	// example: add eax,[rax] -> X64OP_LOAD_ADD (add the value to x64 register)
 	// example: add [rax],eax -> X64OP_LOAD_ADD_STORE (this will probably never happen for MMIO registers)
 
@@ -114,6 +116,7 @@ enum x64_op_t : u32
 	X64OP_STOS,
 	X64OP_XCHG,
 	X64OP_CMPXCHG,
+	X64OP_LOAD_AND_STORE,
 };
 
 void decode_x64_reg_op(const u8* code, x64_op_t& out_op, x64_reg_t& out_reg, size_t& out_size, size_t& out_length)
@@ -308,6 +311,30 @@ void decode_x64_reg_op(const u8* code, x64_op_t& out_op, x64_reg_t& out_reg, siz
 
 		break;
 	}
+	case 0x20:
+	{
+		if (!oso)
+		{
+			out_op = X64OP_LOAD_AND_STORE;
+			out_reg = rex & 8 ? get_modRM_reg(code, rex) : get_modRM_reg_lh(code);
+			out_size = 1;
+			out_length += get_modRM_size(code);
+			return;
+		}
+		break;
+	}
+	case 0x21:
+	{
+		if (true)
+		{
+			out_op = X64OP_LOAD_AND_STORE;
+			out_reg = get_modRM_reg(code, rex);
+			out_size = get_op_size(rex, oso);
+			out_length += get_modRM_size(code);
+			return;
+		}
+		break;
+	}
 	case 0x86:
 	{
 		if (!oso) // XCHG r8/m8, r8
@@ -464,7 +491,7 @@ typedef ucontext_t x64_context;
 #ifdef __APPLE__
 
 #define X64REG(context, reg) (darwin_x64reg(context, reg))
-#define XMMREG(context, reg) (reinterpret_cast<u128*>(&(context)->uc_mcontext->__fs.__fpu_xmm0[reg]))
+#define XMMREG(context, reg) (reinterpret_cast<u128*>(&(context)->uc_mcontext->__fs.__fpu_xmm0.__xmm_reg[reg]))
 #define EFLAGS(context) ((context)->uc_mcontext->__ss.__rflags)
 
 uint64_t* darwin_x64reg(x64_context *context, int reg)
@@ -768,18 +795,27 @@ bool handle_access_violation(u32 addr, bool is_writing, x64_context* context)
 	// check if address is RawSPU MMIO register
 	if (addr - RAW_SPU_BASE_ADDR < (6 * RAW_SPU_OFFSET) && (addr % RAW_SPU_OFFSET) >= RAW_SPU_PROB_OFFSET)
 	{
+		auto t = Emu.GetCPU().GetRawSPUThread((addr - RAW_SPU_BASE_ADDR) / RAW_SPU_OFFSET);
+
+		if (!t)
+		{
+			return false;
+		}
+
 		if (a_size != 4 || !d_size || !i_size)
 		{
 			LOG_ERROR(MEMORY, "Invalid or unsupported instruction (op=%d, reg=%d, d_size=%lld, a_size=0x%llx, i_size=%lld)", op, reg, d_size, a_size, i_size);
 			return false;
 		}
 
+		auto& spu = static_cast<RawSPUThread&>(*t);
+
 		switch (op)
 		{
 		case X64OP_LOAD:
 		{
 			u32 value;
-			if (is_writing || !Memory.ReadMMIO32(addr, value) || !put_x64_reg_value(context, reg, d_size, re32(value)))
+			if (is_writing || !spu.ReadReg(addr, value) || !put_x64_reg_value(context, reg, d_size, re32(value)))
 			{
 				return false;
 			}
@@ -789,7 +825,7 @@ bool handle_access_violation(u32 addr, bool is_writing, x64_context* context)
 		case X64OP_STORE:
 		{
 			u64 reg_value;
-			if (!is_writing || !get_x64_reg_value(context, reg, d_size, i_size, reg_value) || !Memory.WriteMMIO32(addr, re32((u32)reg_value)))
+			if (!is_writing || !get_x64_reg_value(context, reg, d_size, i_size, reg_value) || !spu.WriteReg(addr, re32((u32)reg_value)))
 			{
 				return false;
 			}
@@ -997,6 +1033,29 @@ bool handle_access_violation(u32 addr, bool is_writing, x64_context* context)
 			}
 
 			if (!put_x64_reg_value(context, X64R_RAX, d_size, old_value) || !set_x64_cmp_flags(context, d_size, cmp_value, old_value))
+			{
+				return false;
+			}
+			break;
+		}
+		case X64OP_LOAD_AND_STORE:
+		{
+			u64 value;
+			if (!get_x64_reg_value(context, reg, d_size, i_size, value))
+			{
+				return false;
+			}
+
+			switch (d_size)
+			{
+			case 1: value = vm::priv_ref<atomic_le_t<u8>>(addr) &= value; break;
+			case 2: value = vm::priv_ref<atomic_le_t<u16>>(addr) &= value; break;
+			case 4: value = vm::priv_ref<atomic_le_t<u32>>(addr) &= value; break;
+			case 8: value = vm::priv_ref<atomic_le_t<u64>>(addr) &= value; break;
+			default: return false;
+			}
+
+			if (!set_x64_cmp_flags(context, d_size, value, 0))
 			{
 				return false;
 			}
@@ -1413,61 +1472,10 @@ bool waiter_map_t::is_stopped(u64 signal_id)
 {
 	if (Emu.IsStopped())
 	{
-		LOG_WARNING(Log::HLE, "%s: waiter_op() aborted (signal_id=0x%llx)", m_name.c_str(), signal_id);
+		LOG_WARNING(Log::HLE, "%s: waiter_op() aborted (signal_id=0x%llx)", name.c_str(), signal_id);
 		return true;
 	}
 	return false;
-}
-
-void waiter_map_t::waiter_reg_t::init()
-{
-	if (!thread)
-	{
-		thread = GetCurrentNamedThread();
-
-		std::lock_guard<std::mutex> lock(map.m_mutex);
-
-		// add waiter
-		map.m_waiters.push_back({ signal_id, thread });
-	}
-}
-
-waiter_map_t::waiter_reg_t::~waiter_reg_t()
-{
-	if (thread)
-	{
-		std::lock_guard<std::mutex> lock(map.m_mutex);
-
-		// remove waiter
-		for (s64 i = map.m_waiters.size() - 1; i >= 0; i--)
-		{
-			if (map.m_waiters[i].signal_id == signal_id && map.m_waiters[i].thread == thread)
-			{
-				map.m_waiters.erase(map.m_waiters.begin() + i);
-				return;
-			}
-		}
-
-		LOG_ERROR(HLE, "%s(): waiter not found (signal_id=0x%llx, map='%s')", __FUNCTION__, signal_id, map.m_name.c_str());
-		Emu.Pause();
-	}
-}
-
-void waiter_map_t::notify(u64 signal_id)
-{
-	if (m_waiters.size())
-	{
-		std::lock_guard<std::mutex> lock(m_mutex);
-
-		// find waiter and signal
-		for (auto& v : m_waiters)
-		{
-			if (v.signal_id == signal_id)
-			{
-				v.thread->Notify();
-			}
-		}
-	}
 }
 
 const std::function<bool()> SQUEUE_ALWAYS_EXIT = [](){ return true; };
