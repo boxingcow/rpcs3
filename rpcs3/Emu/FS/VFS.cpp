@@ -161,7 +161,7 @@ vfsDirBase* VFS::OpenDir(const std::string& ps3_path) const
 	return nullptr;
 }
 
-bool VFS::CreateFile(const std::string& ps3_path) const
+bool VFS::CreateFile(const std::string& ps3_path, bool overwrite) const
 {
 	std::string path;
 	if (vfsDevice* dev = GetDevice(ps3_path, path))
@@ -170,7 +170,7 @@ bool VFS::CreateFile(const std::string& ps3_path) const
 
 		if (res)
 		{
-			return res->Create(path);
+			return res->Create(path, overwrite);
 		}
 	}
 
@@ -259,14 +259,18 @@ bool VFS::ExistsDir(const std::string& ps3_path) const
 
 bool VFS::RenameFile(const std::string& ps3_path_from, const std::string& ps3_path_to) const
 {
-	std::string path;
-	if (vfsDevice* dev = GetDevice(ps3_path_from, path))
-	{
-		std::shared_ptr<vfsFileBase> res(dev->GetNewFileStream());
+	std::string path_from, path_to;
 
-		if (res)
+	if (vfsDevice* dev = GetDevice(ps3_path_from, path_from))
+	{
+		if (vfsDevice* dev_ = GetDevice(ps3_path_to, path_to))
 		{
-			return res->Rename(path, ps3_path_to);
+			std::shared_ptr<vfsFileBase> res(dev->GetNewFileStream());
+
+			if (res)
+			{
+				return res->Rename(path_from, path_to);
+			}
 		}
 	}
 
@@ -275,14 +279,18 @@ bool VFS::RenameFile(const std::string& ps3_path_from, const std::string& ps3_pa
 
 bool VFS::RenameDir(const std::string& ps3_path_from, const std::string& ps3_path_to) const
 {
-	std::string path;
-	if (vfsDevice* dev = GetDevice(ps3_path_from, path))
-	{
-		std::shared_ptr<vfsDirBase> res(dev->GetNewDirStream());
+	std::string path_from, path_to;
 
-		if (res)
+	if (vfsDevice* dev = GetDevice(ps3_path_from, path_from))
+	{
+		if (vfsDevice* dev_ = GetDevice(ps3_path_to, path_to))
 		{
-			return res->Rename(path, ps3_path_to);
+			std::shared_ptr<vfsDirBase> res(dev->GetNewDirStream());
+
+			if (res)
+			{
+				return res->Rename(path_from, path_to);
+			}
 		}
 	}
 
