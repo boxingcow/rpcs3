@@ -34,7 +34,7 @@ if (NOT MSVC)
 	set(CMAKE_C_FLAGS_MINSIZEREL "${CMAKE_C_FLAGS_MINSIZEREL} -Os -D_NDEBUG")
 	set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O1 -D_NDEBUG")
 	set(CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO} -O1 -g -D_NDEBUG")
-	add_definitions(-msse2 -mcx16)
+	add_definitions(-msse -msse2 -mcx16 -mssse3)
 endif()
 
 if (APPLE)
@@ -45,6 +45,7 @@ endif()
 if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 	#on some Linux distros shm_unlink and similar functions are in librt only
 	set(ADDITIONAL_LIBS "rt")
+	set(ADDITIONAL_LIBS "X11")
 elseif(UNIX)
 	#it seems like glibc includes the iconv functions we use but other libc
 	#implementations like the one on OSX don't seem implement them
