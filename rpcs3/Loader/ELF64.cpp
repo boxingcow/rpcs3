@@ -1,6 +1,5 @@
 #include "stdafx.h"
 #include "Utilities/Log.h"
-#include "Utilities/rFile.h"
 #include "Emu/FS/vfsStream.h"
 #include "Emu/FS/vfsFile.h"
 #include "Emu/FS/vfsDir.h"
@@ -328,6 +327,11 @@ namespace loader
 			
 			for (const auto module : lle_dir)
 			{
+				if (module->flags & DirEntry_TypeDir)
+				{
+					continue;
+				}
+
 				elf64 sprx_handler;
 
 				vfsFile fsprx(lle_dir.GetPath() + "/" + module->name);
